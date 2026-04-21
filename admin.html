@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orhane Admin | Finansal Kontrol Paneli</title>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <style>
+        :root { --p: #6366f1; --s: #10b981; --pink: #db2777; --bg: #0b0f1a; --c: #161b2c; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; padding: 20px; margin: 0; }
+        
+        .stats-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
+        .stat-card { background: var(--c); padding: 20px; border-radius: 16px; border: 1px solid #2d334a; text-align: center; border-bottom: 4px solid var(--p); }
+        .stat-card h3 { margin: 0; font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; }
+        .stat-card div { font-size: 1.5rem; font-weight: bold; margin-top: 10px; }
+
+        h2 { border-left: 4px solid var(--p); padding-left: 10px; font-size: 1.2rem; margin-top: 30px; }
+        .card { background: var(--c); padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #2d334a; display: flex; justify-content: space-between; align-items: center; }
+        
+        .btn { padding: 8px 15px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; background: var(--s); color: white; transition: 0.3s; }
+        .btn:hover { opacity: 0.8; }
+        .btn-red { background: var(--pink); margin-left: 5px; }
+        
+        small { color: #94a3b8; }
+        b { color: var(--p); }
+    </style>
+</head>
+<body>
+
+    <div class="stats-container">
+        <div class="stat-card" style="border-bottom-color: var(--pink);">
+            <h3>TOPLAM BAKİYE (BORÇ)</h3>
+            <div id="total-user-balance">0.00 TL</div>
+        </div>
+        <div class="stat-card" style="border-bottom-color: var(--s);">
+            <h3>TOPLAM YATIRILAN</h3>
+            <div id="total-deposited-amount">0.00 TL</div>
+        </div>
+    </div>
+
+    <h2>🚀 Bekleyen Talepler</h2>
+    <div id="req-list">Yükleniyor...</div>
+
+    <h2>👥 Tüm Üyeler</h2>
+    <div id="user-list">Yükleniyor...</div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAy-QZ960SSl9lzpCvCaLuw-y2XOv8Xd7Q",
+            authDomain: "orhan-finance.firebaseapp.com",
+            projectId: "orhan-finance",
+            databaseURL: "https://orhan-finance-default-rtdb.firebaseio.com/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Finansal Verileri Hesapla
+        function updateFinances() {
+            // 1. Toplam Kullanıcı Bakiyelerini Topla
+            db.ref('users').on('value', snap => {
+                let totalBal = 0;
+                snap.forEach(u => {
+                    totalBal += (u.val().balance || 0);
+                });
+                document.getElementById('total-user-balance').innerText = totalBal.toFixed(2) + " TL";
+            });
+
+            // 2. Sistemdeki Toplam Yatırılan Parayı Çek
+            db.ref('admin/totalDeposited').on('value', snap => {
+                const totalDep = snap.val() || 0;
+                document.getElementById('total-deposited-amount').innerText = totalDep.toFixed(2) + " TL";
+            });
+        }
+
+        // Talepleri Listele
+        db.ref('requests').on('value', snap => {
+            const div = document.getElementById('req-list');
+            div.innerHTML = "";
+            if(!snap.exists()) div.innerHTML = "<small>Bekleyen talep yok.</small>";
+            
+            snap.forEach(c => {
+                const r = c.val();
+                div.innerHTML += `<div class="card">
+                    <div>
+                        <b>${r.user}</b> - ${r.amount} TL <span style="color:var(--warn)">[${r.type}]</span><br>
+                        <small>${r.date || ''} - ${r.detail || ''}</small>
+                    </div>
+                    <div>
+                        <button class="btn" onclick="approve('${c.key}', '${r.user}', ${r.amount}, '${r.type}')">ONAYLA</button>
+                        <button class="btn btn-red" onclick="reject('${c.key}')">SİL</button>
+                    </div>
+                </div>`;
+            });
+        });
+
+        // Üyeleri Listele
+        db.ref('users').on('value', snap => {
+            const div = document.getElementById('user-list');
+            div.innerHTML = "";
+            snap.forEach(c => {
+                const u = c.val();
+                div.innerHTML += `<div class="card">
+                    <div><b>${c.key}</b> <small>(${u.email || 'No-Email'})</small><br>Bakiye: ${u.balance.toFixed(2)} TL</div>
+                    <div style="text-align:right"><small>PW: ${u.pass}</small><br><span style="color:var(--p)">${u.refCode}</span></div>
+                </div>`;
+            });
+        });
+
+        // Onaylama İşlemi
+        function approve(id, user, amt, type) {
+            if(type === 'Yükleme') {
+                // Bakiyeyi ekle
+                db.ref('users/' + user + '/balance').transaction(b => (b || 0) + parseFloat(amt));
+                // Toplam yatırılan istatistiğini güncelle
+                db.ref('admin/totalDeposited').transaction(current => (current || 0) + parseFloat(amt));
+            }
+            // Talebi sil
+            db.ref('requests/' + id).remove();
+            alert("İşlem Başarılı!");
+        }
+
+        // Reddetme/Silme
+        function reject(id) {
+            if(confirm("Bu talebi silmek istediğine emin misin?")) {
+                db.ref('requests/' + id).remove();
+            }
+        }
+
+        // Başlat
+        updateFinances();
+    </script>
+</body>
+</html>

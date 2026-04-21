@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orhane Finance | V3 Premium</title>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <style>
+        :root { --p: #6366f1; --bg: #0b0f1a; --c: #161b2c; --t: #f8fafc; --s: #10b981; --warn: #f59e0b; --pink: #db2777; --sky: #0ea5e9; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--t); margin: 0; padding-bottom: 140px; overflow-x: hidden; }
+        
+        /* Auth Styles */
+        #auth-page { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .auth-card { background: var(--c); padding: 25px; border-radius: 20px; width: 100%; max-width: 400px; border: 1px solid #2d334a; text-align: center; }
+        .auth-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .auth-tab { flex: 1; padding: 10px; cursor: pointer; border-bottom: 2px solid transparent; color: #94a3b8; }
+        .auth-tab.active { border-color: var(--p); color: white; }
+        
+        #app-content { display: none; }
+        .header { background: var(--c); padding: 20px; border-bottom: 1px solid #2d334a; text-align: center; position: sticky; top: 0; z-index: 100; }
+        .main-balance { font-size: 2.2rem; font-weight: 800; color: var(--s); margin: 5px 0; }
+        .profit-preview { font-size: 1rem; color: var(--warn); font-weight: bold; }
+        
+        .container { padding: 15px; max-width: 500px; margin: auto; }
+        .card { background: var(--c); padding: 18px; border-radius: 16px; margin-bottom: 15px; border: 1px solid #2d334a; }
+        
+        .task-box { display: flex; align-items: center; justify-content: space-between; background: #0b0f1a; padding: 12px; border-radius: 12px; margin-top: 10px; border-left: 4px solid var(--sky); }
+        .task-info b { font-size: 0.9rem; display: block; }
+        .task-info span { font-size: 0.75rem; color: var(--s); }
+        .task-btn { background: var(--sky); color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+
+        #wheel-wrapper { position: relative; width: 180px; height: 180px; margin: 15px auto; }
+        #wheel { width: 100%; height: 100%; border-radius: 50%; border: 5px solid #334155; transition: 4s cubic-bezier(0.1, 0, 0.1, 1); 
+            background: conic-gradient(#ef4444 0 60deg, #f59e0b 60deg 120deg, #10b981 120deg 180deg, #3b82f6 180deg 240deg, #6366f1 240deg 300deg, #8b5cf6 300deg 360deg); 
+            display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: white; font-weight: bold; }
+
+        .nav { position: fixed; bottom: 50px; width: 100%; background: var(--c); display: flex; justify-content: space-around; padding: 15px 0; border-top: 1px solid #2d334a; z-index: 1000; }
+        .nav-item { cursor: pointer; font-size: 0.75rem; color: #94a3b8; text-align: center; }
+        .active-nav { color: var(--p); }
+        .tab-content { display: none; }
+        .active { display: block; }
+
+        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #2d334a; background: #0b0f1a; color: white; box-sizing: border-box; }
+        .btn-act { background: var(--p); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
+        .live-ticker { position: fixed; bottom: 0; width: 100%; background: #059669; color: white; padding: 10px 0; font-size: 0.8rem; overflow: hidden; white-space: nowrap; }
+    </style>
+</head>
+<body>
+
+<div id="auth-page">
+    <div class="auth-card">
+        <div class="auth-tabs">
+            <div class="auth-tab active" onclick="toggleAuth('login')">Giriş Yap</div>
+            <div class="auth-tab" onclick="toggleAuth('register')">Kayıt Ol</div>
+        </div>
+        <h2 style="color: var(--p); margin-bottom: 15px;">Orhane Finance</h2>
+        <input type="text" id="auth-user" placeholder="Kullanıcı Adı">
+        <input type="email" id="auth-email" placeholder="E-Posta Adresi" style="display: none;">
+        <input type="password" id="auth-pass" placeholder="Şifre">
+        <button class="btn-act" id="auth-btn" onclick="handleAuth()">GİRİŞ YAP</button>
+    </div>
+</div>
+
+<div id="app-content">
+    <div class="header">
+        <div style="display:flex; justify-content:center; align-items:baseline; gap:8px;">
+            <div class="main-balance" id="display-bakiye">0.00 TL</div>
+            <div class="profit-preview" id="display-kar">(+0.00)</div>
+        </div>
+        <div id="status-text" style="font-size: 0.7rem; color: var(--warn); font-weight: bold;">Standart Üye</div>
+    </div>
+
+    <div class="container">
+        <div id="tab-earn" class="tab-content active">
+            <div class="card">
+                <h3 style="margin:0 0 10px 0; font-size: 1rem;">📺 Video İzle Kazan</h3>
+                <div class="task-box">
+                    <div class="task-info"><b>Kısa Video 1</b><span>+0.75 TL Kazanç</span></div>
+                    <button class="task-btn" onclick="startTask('v1', 0.75, 'https://www.youtube.com')">İZLE</button>
+                </div>
+                <div class="task-box" style="border-left-color: var(--p);">
+                    <div class="task-info"><b>Premium Reklam</b><span>+1.50 TL Kazanç</span></div>
+                    <button class="task-btn" style="background:var(--p)" onclick="startTask('v2', 1.50, 'https://www.google.com/ads')">İZLE</button>
+                </div>
+                <div class="task-box" style="border-left-color: var(--pink);">
+                    <div class="task-info"><b>Uzun Tanıtım</b><span>+3.00 TL Kazanç</span></div>
+                    <button class="task-btn" style="background:var(--pink)" onclick="startTask('v3', 3.00, 'https://vimeo.com')">İZLE</button>
+                </div>
+            </div>
+
+            <div class="card" style="text-align: center;">
+                <h3>Şanslı Çark</h3>
+                <div id="wheel-wrapper">
+                    <div id="wheel">
+                        <span style="transform: rotate(30deg) translateY(-55px);">1 TL</span>
+                        <span style="transform: rotate(90deg) translateY(-55px);">0.10</span>
+                        <span style="transform: rotate(150deg) translateY(-55px);">5 TL</span>
+                        <span style="transform: rotate(210deg) translateY(-55px);">0.50</span>
+                        <span style="transform: rotate(270deg) translateY(-55px);">2 TL</span>
+                        <span style="transform: rotate(330deg) translateY(-55px);">0.05</span>
+                    </div>
+                </div>
+                <button class="btn-act" style="background:var(--s); width:auto; padding:10px 30px;" onclick="spin()">ÇEVİR (0.50 TL)</button>
+            </div>
+
+            <div class="card" style="text-align: center;">
+                <button style="width:80px; height:80px; border-radius:50%; border:4px solid var(--p); background:none; color:white; font-weight:bold;" onclick="tap()">TIKLA</button>
+                <p>Kalan Hak: <span id="tap-lim">200</span></p>
+            </div>
+        </div>
+
+        <div id="tab-deposit" class="tab-content">
+            <div class="card">
+                <h3>Bakiye Yükle & Bonus</h3>
+                <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:10px;">
+                    📈 <b>Günlük Kar Bonusları:</b><br>
+                    1.000 TL+ : %0.5 | 2.000 TL+ : %1.0 | 5.000 TL+ : %2.5 | 10.000 TL+ : %5.0
+                </div>
+                <input type="number" id="dep-amt" placeholder="Yüklenecek Tutar">
+                <button class="btn-act" onclick="requestDeposit()">YÜKLEME TALEBİ GÖNDER</button>
+            </div>
+        </div>
+
+        <div id="tab-profile" class="tab-content">
+            <div class="card">
+                <h3>Profil Bilgileri</h3>
+                <p>Kullanıcı: <b id="prof-user">-</b></p>
+                <p>Referans: <b id="prof-ref" style="color:var(--p)">-</b></p>
+                <hr border="0" style="border-top: 1px solid #2d334a; margin: 15px 0;">
+                <input type="text" id="prof-fullname" placeholder="Ad Soyad">
+                <button class="btn-act" onclick="saveProfile()">GÜNCELLE</button>
+            </div>
+        </div>
+
+        <div id="tab-withdraw" class="tab-content">
+            <div class="card">
+                <h3>Para Çekme (Min: 100 TL)</h3>
+                <p style="font-size:0.75rem; color:var(--pink);">* Çekimler arası 7 gün bekleme süresi vardır.</p>
+                <input type="text" id="wit-iban" placeholder="IBAN ve İsim">
+                <input type="number" id="wit-amt" placeholder="Tutar">
+                <button class="btn-act" style="background:var(--pink)" onclick="requestWithdraw()">ÇEKİM TALEBİ</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav">
+        <div class="nav-item active-nav" onclick="showTab('earn', this)">💰<br>Kazan</div>
+        <div class="nav-item" onclick="showTab('deposit', this)">📥<br>Yükle</div>
+        <div class="nav-item" onclick="showTab('withdraw', this)">📤<br>Çek</div>
+        <div class="nav-item" onclick="showTab('profile', this)">👤<br>Profil</div>
+    </div>
+
+    <div class="live-ticker">
+        <div style="display:inline-block; animation: ticker 25s linear infinite;">
+             🔥 GÜNLÜK BONUSLAR ARTIRILDI! | 10.000 TL YATIRIMA GÜNLÜK %5 KAZANÇ | MİNİMUM ÇEKİM 100 TL ✅
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyAy-QZ960SSl9lzpCvCaLuw-y2XOv8Xd7Q",
+        authDomain: "orhan-finance.firebaseapp.com",
+        projectId: "orhan-finance",
+        databaseURL: "https://orhan-finance-default-rtdb.firebaseio.com/"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let currentUser = "";
+    let localData = {};
+    let authMode = "login";
+
+    function toggleAuth(mode) {
+        authMode = mode;
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById('auth-email').style.display = mode === 'register' ? 'block' : 'none';
+        document.getElementById('auth-btn').innerText = mode === 'register' ? 'KAYIT OL' : 'GİRİŞ YAP';
+    }
+
+    function handleAuth() {
+        const user = document.getElementById('auth-user').value.trim();
+        const email = document.getElementById('auth-email').value.trim();
+        const pass = document.getElementById('auth-pass').value.trim();
+        if(!user || !pass || (authMode === 'register' && !email)) return alert("Lütfen tüm alanları doldurun!");
+
+        db.ref('users/' + user).once('value', s => {
+            if(authMode === 'login') {
+                if(s.exists() && s.val().pass === pass) startApp(user);
+                else alert("Kullanıcı bulunamadı veya şifre hatalı!");
+            } else {
+                if(s.exists()) return alert("Bu kullanıcı adı zaten alınmış!");
+                db.ref('users/' + user).set({
+                    email: email, pass: pass, balance: 0, tapLim: 200, 
+                    refCode: Math.random().toString(36).substring(7).toUpperCase(),
+                    lastWithdraw: 0, fullname: ""
+                }).then(() => startApp(user));
+            }
+        });
+    }
+
+    function startApp(user) {
+        currentUser = user;
+        document.getElementById('auth-page').style.display = 'none';
+        document.getElementById('app-content').style.display = 'block';
+        listenData();
+    }
+
+    function listenData() {
+        db.ref('users/' + currentUser).on('value', s => {
+            localData = s.val();
+            const bal = localData.balance || 0;
+            
+            // Dinamik Bonus Hesaplama
+            let rate = 0;
+            if(bal >= 10000) rate = 0.05;
+            else if(bal >= 5000) rate = 0.025;
+            else if(bal >= 2000) rate = 0.01;
+            else if(bal >= 1000) rate = 0.005;
+            
+            document.getElementById('display-bakiye').innerText = bal.toFixed(2) + " TL";
+            document.getElementById('display-kar').innerText = "(+" + (bal * rate).toFixed(2) + ")";
+            document.getElementById('tap-lim').innerText = localData.tapLim;
+            document.getElementById('prof-user').innerText = currentUser;
+            document.getElementById('prof-ref').innerText = localData.refCode;
+            
+            let status = "Standart Üye";
+            if(rate > 0) status = `Vip Üye (%${(rate*100).toFixed(1)} Kar)`;
+            document.getElementById('status-text').innerText = status;
+        });
+    }
+
+    function startTask(id, reward, link) {
+        alert("Video başlatılıyor... Kazancın 15 saniye içinde eklenecektir.");
+        window.open(link, '_blank');
+        setTimeout(() => {
+            db.ref('users/' + currentUser).update({ balance: localData.balance + reward });
+            alert("Tebrikler! " + reward + " TL hesabına eklendi.");
+        }, 15000);
+    }
+
+    function tap() {
+        if(localData.tapLim > 0) {
+            db.ref('users/' + currentUser).update({ balance: localData.balance + 0.05, tapLim: localData.tapLim - 1 });
+        } else alert("Günlük tık limitin doldu!");
+    }
+
+    function spin() {
+        if(localData.balance < 0.50) return alert("Bakiyen yetersiz!");
+        const deg = Math.floor(Math.random() * 3000) + 720;
+        document.getElementById('wheel').style.transform = `rotate(${deg}deg)`;
+        db.ref('users/' + currentUser).update({ balance: localData.balance - 0.50 });
+        setTimeout(() => {
+            const prizes = [1, 0.10, 5, 0.50, 2, 0.05];
+            const p = prizes[Math.floor(Math.random() * prizes.length)];
+            db.ref('users/' + currentUser).update({ balance: localData.balance + p });
+            alert("Çarktan " + p + " TL kazandın!");
+        }, 4000);
+    }
+
+    function requestDeposit() {
+        const amt = document.getElementById('dep-amt').value;
+        if(!amt || amt <= 0) return alert("Geçerli bir miktar girin!");
+        db.ref('requests').push({ user: currentUser, type: 'Yükleme', amount: amt, date: new Date().toLocaleString() });
+        alert("Yükleme talebi yöneticiye iletildi. Onaylanınca bakiyenize ve bonusunuza yansıyacaktır.");
+    }
+
+    function requestWithdraw() {
+        const amt = parseFloat(document.getElementById('wit-amt').value);
+        const now = Date.now();
+        const week = 7 * 24 * 60 * 60 * 1000;
+
+        if(amt < 100) return alert("En az 100 TL çekebilirsiniz!");
+        if(amt > localData.balance) return alert("Yetersiz bakiye!");
+        if(localData.lastWithdraw && (now - localData.lastWithdraw < week)) {
+            return alert("7 gün kuralı! Lütfen bekleyin.");
+        }
+
+        db.ref('requests').push({ user: currentUser, type: 'Çekme', amount: amt, detail: document.getElementById('wit-iban').value, date: new Date().toLocaleString() });
+        db.ref('users/' + currentUser).update({ balance: localData.balance - amt, lastWithdraw: now });
+        alert("Çekim talebi alındı.");
+    }
+
+    function saveProfile() {
+        db.ref('users/' + currentUser).update({ fullname: document.getElementById('prof-fullname').value });
+        alert("Profil güncellendi.");
+    }
+
+    function showTab(id, el) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
+        document.getElementById('tab-' + id).classList.add('active');
+        el.classList.add('active-nav');
+    }
+</script>
+
+<style>
+    @keyframes ticker { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
+</style>
+</body>
+</html>
